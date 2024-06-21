@@ -26,37 +26,10 @@ enum SquareState {
     ZoneKeeper,
 }
 
-#[derive(Clone, Copy)]
-struct Counts {
-    p1: RwSignal<usize>,
-    p2: RwSignal<usize>,
-}
-
-impl Counts {
-    fn new() -> Self {
-        let (p1, p2) = (
-            RwSignal::new(PLAYER_SOLIDERS_INIT),
-            RwSignal::new(PLAYER_SOLIDERS_INIT),
-        );
-        Self { p1, p2 }
-    }
-
-    fn reset(&self) {
-        self.p1.set(PLAYER_SOLIDERS_INIT);
-        self.p2.set(PLAYER_SOLIDERS_INIT);
-    }
-
-    fn get(&self, player: Player) -> RwSignal<usize> {
-        match player {
-            Player::One => self.p1,
-            Player::Two => self.p2,
-        }
-    }
-}
+mod soliders_counter;
 
 const ROW_WIDTH: usize = 5;
 const MIDDLE_X_SQUARE: usize = ROW_WIDTH / 2;
-const PLAYER_SOLIDERS_INIT: usize = (ROW_WIDTH * ROW_WIDTH) / 2;
 
 lazy_static::lazy_static! {
     static ref ALL_SQUARES : AllSquares = Square::all_squares();
@@ -121,7 +94,7 @@ impl Square {
             position: Position { y, x },
         }
     }
-    fn should_die(&self, players_soliders: Counts) {
+    fn should_die(&self, players_soliders: soliders_counter::SolidersCounter) {
         let get_state = |position: Option<Position>| {
             position
                 .map(|pos| ALL_SQUARES.get_square(pos))
@@ -242,15 +215,15 @@ impl AQ for AllSquares {
 
 #[component]
 pub fn App() -> impl IntoView {
-    let players_soliders = Counts::new();
+    let players_soliders = soliders_counter::SolidersCounter::new();
     let player_turn = RwSignal::new(Player::One);
     let winner = RwSignal::new(None::<Player>);
     provide_context(player_turn);
     provide_context(players_soliders.clone());
     provide_context(winner);
     Effect::new(move |_| {
-        let pn1 = players_soliders.p1.get();
-        let pn2 = players_soliders.p2.get();
+        let pn1 = players_soliders.get(Player::One).get();
+        let pn2 = players_soliders.get(Player::Two).get();
         if pn1 == 0 || pn1 == 1 {
             winner.set(Some(Player::Two));
         }
@@ -260,14 +233,10 @@ pub fn App() -> impl IntoView {
     });
     view! {
         <main class="flex flex-col min-h-screen justify-center items-center">
-        <Show
-            when=move || winner.get().is_none()
-            fallback=move || view! {
-                 <WinningCard/>
-            }
-        >
-            <BattleField/>
+        <Show when=move || winner.get().is_some()>
+             <WinningCard/>
         </Show>
+        <BattleField/>
         </main>
     }
 }
@@ -275,23 +244,41 @@ pub fn App() -> impl IntoView {
 #[component]
 fn WinningCard() -> impl IntoView {
     let winner = use_context::<RwSignal<Option<Player>>>().unwrap();
-    let players_soliders = use_context::<Counts>().unwrap();
+    let players_soliders = use_context::<soliders_counter::SolidersCounter>().unwrap();
     let on_click = move |_| {
         winner.set(None);
         players_soliders.reset();
+        ALL_SQUARES.iter().enumerate().for_each(|(yi, y)| {
+            y.iter().enumerate().for_each(|(xi, x)| {
+                if yi < MIDDLE_X_SQUARE {
+                    x.state.set(SquareState::Player(Player::One))
+                } else if yi > MIDDLE_X_SQUARE {
+                    x.state.set(SquareState::Player(Player::Two))
+                } else if xi < MIDDLE_X_SQUARE {
+                    x.state.set(SquareState::Player(Player::One))
+                } else if xi > MIDDLE_X_SQUARE {
+                    x.state.set(SquareState::Player(Player::Two))
+                } else {
+                    x.state.set(SquareState::Empty)
+                }
+            })
+        });
     };
     view! {
-        <>
-            <p>{format!("winner is Player {:#?}",winner.get().unwrap())}</p>
-            <button on:click=on_click>"play again"</button>
-        <>
+        <div class="bg-white z-20 text-2xl">
+            <p class="border-2 p-5 m-5">{format!("winner is Player {:#?}",winner.get().unwrap())}</p>
+            <button
+                on:click=on_click
+                class="border-2 p-5 m-5"
+            >"play again"</button>
+        </div>
     }
 }
 
 #[component]
 fn BattleField() -> impl IntoView {
     let clean_zone = RwSignal::new(true);
-    let players_soliders = use_context::<Counts>().unwrap();
+    let players_soliders = use_context::<soliders_counter::SolidersCounter>().unwrap();
     let player_one = move || format!("player one : {}", players_soliders.get(Player::One).get());
     let player_two = move || format!("player two : {}", players_soliders.get(Player::Two).get());
     view! {
@@ -325,7 +312,7 @@ fn BattleField() -> impl IntoView {
 
 #[component]
 fn SquareComp(square: Square, clean_zone: RwSignal<bool>) -> impl IntoView {
-    let players_soliders = use_context::<Counts>().unwrap();
+    let players_soliders = use_context::<soliders_counter::SolidersCounter>().unwrap();
     let player_turn = use_context::<RwSignal<Player>>().unwrap();
     let neighbours = square.get_neighbours();
     let empty_neighbours = move || {
