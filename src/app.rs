@@ -172,18 +172,10 @@ impl Square {
         let right = self.position.right();
         let up = self.position.up();
         let down = self.position.down();
-        let up_right = up.as_ref().and_then(|up| up.right());
-        let up_left = up.as_ref().and_then(|up| up.left());
-        let down_right = down.as_ref().and_then(|down| down.right());
-        let down_left = down.as_ref().and_then(|down| down.left());
         push_to_result(left);
         push_to_result(right);
         push_to_result(up);
         push_to_result(down);
-        push_to_result(up_right);
-        push_to_result(up_left);
-        push_to_result(down_right);
-        push_to_result(down_left);
         result
     }
 }
