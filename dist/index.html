@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>seega</title>
+  <link rel="stylesheet" href="/tailwind-6bd4f8a418ac36ef.css" integrity="sha384&#x2D;Mt&#x2F;jgRTOaCGvZCsGJAvymyl0mxatYapz&#x2F;p40Z4VFtpR7&#x2F;OGMpz3xsqS2iCbHz3Zp"/>
+  
+  
+<script type="module" nonce="sfqP9ydyeDmbr8iN1Jg2MA==">
+import init, * as bindings from '/seega-ui-f617152e56b338f.js';
+const wasm = await init('/seega-ui-f617152e56b338f_bg.wasm');
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
+
+<link rel="modulepreload" href="/seega-ui-f617152e56b338f.js" crossorigin=anonymous integrity="sha384-NJTAbgsBhGtuaZhBdApj+Ft7PEg/8KdwmquyF/JFzAPhzQHVKP85SXv7bhJzdiuI">
+<link rel="preload" href="/seega-ui-f617152e56b338f_bg.wasm" crossorigin=anonymous integrity="sha384-xF3vTGxbrbfasQnDrv7NxXSv3oTtVNSPD9HQb813Ff7t0jyAFwhtI3GkleDNv8bb" as="fetch" type="application/wasm"></head>
+
+<body></body>
+
+</html>
