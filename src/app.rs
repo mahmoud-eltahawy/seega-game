@@ -123,22 +123,6 @@ impl Square {
             get_state(self.position.down()),
         ) {
             compare(up_player, down_player)
-        } else if let (
-            Some(SquareState::Player(up_right_player)),
-            Some(SquareState::Player(down_left_player)),
-        ) = (
-            get_state(self.position.up().and_then(|x| x.right())),
-            get_state(self.position.down().and_then(|x| x.left())),
-        ) {
-            compare(up_right_player, down_left_player)
-        } else if let (
-            Some(SquareState::Player(up_left_player)),
-            Some(SquareState::Player(down_right_player)),
-        ) = (
-            get_state(self.position.up().and_then(|x| x.left())),
-            get_state(self.position.down().and_then(|x| x.right())),
-        ) {
-            compare(up_left_player, down_right_player)
         } else {
             false
         };
