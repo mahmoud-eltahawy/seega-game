@@ -1,10 +1,6 @@
 use leptos::{ev, html::button, prelude::*};
 
-#[derive(Debug, Clone, Copy)]
-struct Square {
-    state: RwSignal<SquareState>,
-    position: Position,
-}
+type Square = RwSignal<SquareState>;
 
 #[derive(Debug, Clone, Copy)]
 struct Position {
@@ -29,19 +25,19 @@ enum SquareState {
 mod soliders_counter;
 
 const ROW_WIDTH: usize = 5;
-const MIDDLE_X_SQUARE: usize = ROW_WIDTH / 2;
 
 lazy_static::lazy_static! {
-    static ref ALL_SQUARES : AllSquares = Square::all_squares();
+    static ref ALL_SQUARES :[[Square;ROW_WIDTH] ;ROW_WIDTH]  = [[Square::new(SquareState::Empty);ROW_WIDTH] ;ROW_WIDTH];
 }
 
 lazy_static::lazy_static! {
     static ref ALL_NEIGHBOURS : Vec<Vec<Vec<Square>>> = ALL_SQUARES
-        .iter()
-        .map(|xs|
+        .iter().enumerate()
+        .map(|(y,xs)|
             xs
             .iter()
-            .map(|x| x.explore_neighbours())
+            .enumerate()
+            .map(|(x,_)| Position{y,x}.explore_neighbours())
             .collect::<Vec<_>>())
         .collect::<Vec<_>>();
 }
@@ -84,23 +80,43 @@ impl Position {
             None
         }
     }
+
+    fn explore_neighbours(self) -> Vec<Square> {
+        let mut result = Vec::new();
+        let mut push_to_result = |direct: Option<Position>| {
+            if let Some(position) = direct {
+                result.push(ALL_SQUARES.get_square(position).cloned().unwrap());
+            };
+        };
+        let left = self.left();
+        let right = self.right();
+        let up = self.up();
+        let down = self.down();
+        push_to_result(left);
+        push_to_result(right);
+        push_to_result(up);
+        push_to_result(down);
+        result
+    }
+
+    fn get_neighbours(self) -> &'static Vec<Square> {
+        let Position { y, x } = self;
+        ALL_NEIGHBOURS.get(y).and_then(|list| list.get(x)).unwrap()
+    }
 }
 
-type AllSquares = Vec<Vec<Square>>;
-impl Square {
-    fn new(state: SquareState, y: usize, x: usize) -> Self {
-        Self {
-            state: RwSignal::new(state),
-            position: Position { y, x },
-        }
-    }
-    fn should_die(&self, players_soliders: soliders_counter::SolidersCounter) {
+type AllSquares = [[RwSignal<SquareState>; ROW_WIDTH]; ROW_WIDTH];
+trait Sq {
+    fn should_die(&self, position: Position, players_soliders: soliders_counter::SolidersCounter);
+}
+impl Sq for Square {
+    fn should_die(&self, position: Position, players_soliders: soliders_counter::SolidersCounter) {
         let get_state = |position: Option<Position>| {
             position
                 .map(|pos| ALL_SQUARES.get_square(pos))
-                .and_then(|x| x.map(|x| x.state.get_untracked()))
+                .and_then(|x| x.map(|x| x.get_untracked()))
         };
-        let SquareState::Player(self_player) = self.state.get_untracked() else {
+        let SquareState::Player(self_player) = self.get_untracked() else {
             return;
         };
         let compare = {
@@ -110,73 +126,23 @@ impl Square {
         let should_it = if let (
             Some(SquareState::Player(left_player)),
             Some(SquareState::Player(right_player)),
-        ) = (
-            get_state(self.position.left()),
-            get_state(self.position.right()),
-        ) {
+        ) = (get_state(position.left()), get_state(position.right()))
+        {
             compare(left_player, right_player)
         } else if let (
             Some(SquareState::Player(up_player)),
             Some(SquareState::Player(down_player)),
-        ) = (
-            get_state(self.position.up()),
-            get_state(self.position.down()),
-        ) {
+        ) = (get_state(position.up()), get_state(position.down()))
+        {
             compare(up_player, down_player)
         } else {
             false
         };
         if should_it {
-            self.state.set(SquareState::Empty);
+            self.set(SquareState::Empty);
             let s = players_soliders.get(self_player);
             s.update(|x| *x -= 1);
         }
-    }
-    fn all_squares() -> AllSquares {
-        assert_eq!(ROW_WIDTH % 2, 1);
-        (0..ROW_WIDTH)
-            .map(|y| {
-                (0..ROW_WIDTH)
-                    .map(|x| {
-                        let state = if y < MIDDLE_X_SQUARE {
-                            SquareState::Player(Player::One)
-                        } else if y > MIDDLE_X_SQUARE {
-                            SquareState::Player(Player::Two)
-                        } else if x < MIDDLE_X_SQUARE {
-                            SquareState::Player(Player::One)
-                        } else if x > MIDDLE_X_SQUARE {
-                            SquareState::Player(Player::Two)
-                        } else {
-                            SquareState::Empty
-                        };
-                        Self::new(state, y, x)
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>()
-    }
-
-    fn get_neighbours(&self) -> &'static Vec<Square> {
-        let Position { y, x } = self.position;
-        ALL_NEIGHBOURS.get(y).and_then(|list| list.get(x)).unwrap()
-    }
-
-    fn explore_neighbours(&self) -> Vec<Square> {
-        let mut result = Vec::new();
-        let mut push_to_result = |direct: Option<Position>| {
-            if let Some(position) = direct {
-                result.push(ALL_SQUARES.get_square(position).cloned().unwrap());
-            };
-        };
-        let left = self.position.left();
-        let right = self.position.right();
-        let up = self.position.up();
-        let down = self.position.down();
-        push_to_result(left);
-        push_to_result(right);
-        push_to_result(up);
-        push_to_result(down);
-        result
     }
 }
 
@@ -224,21 +190,9 @@ fn WinningCard() -> impl IntoView {
     let on_click = move |_| {
         winner.set(None);
         players_soliders.reset();
-        ALL_SQUARES.iter().enumerate().for_each(|(yi, y)| {
-            y.iter().enumerate().for_each(|(xi, x)| {
-                if yi < MIDDLE_X_SQUARE {
-                    x.state.set(SquareState::Player(Player::One))
-                } else if yi > MIDDLE_X_SQUARE {
-                    x.state.set(SquareState::Player(Player::Two))
-                } else if xi < MIDDLE_X_SQUARE {
-                    x.state.set(SquareState::Player(Player::One))
-                } else if xi > MIDDLE_X_SQUARE {
-                    x.state.set(SquareState::Player(Player::Two))
-                } else {
-                    x.state.set(SquareState::Empty)
-                }
-            })
-        });
+        ALL_SQUARES
+            .iter()
+            .for_each(|y| y.iter().for_each(|x| x.set(SquareState::Empty)));
     };
     view! {
         <div class="bg-white z-20 text-2xl">
@@ -265,14 +219,15 @@ fn BattleField() -> impl IntoView {
             ALL_SQUARES
                 .clone()
                 .into_iter()
-                .map(|squares| {
+                .enumerate()
+                .map(|(y,squares)| {//TODO
                     view! {
                         <For
-                            each=move || squares.clone()
-                            key=|square| {square.position.x}
+                            each=move || {squares.clone().into_iter().enumerate().collect::<Vec<_>>()}
+                            key=|(i,_)| {*i}
                             let:square
                         >
-                            <SquareComp square clean_zone/>
+                            <SquareComp square=square.1 position=Position { y , x:square.0  } clean_zone/>
                         </For>
 
                     }
@@ -287,17 +242,17 @@ fn BattleField() -> impl IntoView {
 }
 
 #[component]
-fn SquareComp(square: Square, clean_zone: RwSignal<bool>) -> impl IntoView {
+fn SquareComp(square: Square, position: Position, clean_zone: RwSignal<bool>) -> impl IntoView {
     let players_soliders = use_context::<soliders_counter::SolidersCounter>().unwrap();
     let player_turn = use_context::<RwSignal<Player>>().unwrap();
-    let neighbours = square.get_neighbours();
+    let neighbours = position.get_neighbours();
     let empty_neighbours = move || {
         neighbours
             .iter()
-            .filter(|x| matches!(x.state.get(), SquareState::Empty))
+            .filter(|x| matches!(x.get(), SquareState::Empty))
             .collect::<Vec<_>>()
     };
-    let clickable = move || match square.state.get() {
+    let clickable = move || match square.get() {
         SquareState::Player(player) if !empty_neighbours().is_empty() && clean_zone.get() => {
             player == player_turn.get()
         }
@@ -306,38 +261,38 @@ fn SquareComp(square: Square, clean_zone: RwSignal<bool>) -> impl IntoView {
     };
 
     let on_click = move |_| {
-        let state = square.state.get_untracked();
+        let state = square.get_untracked();
         match state {
             SquareState::Player(player) => {
-                square.state.set(SquareState::ZoneKeeper);
+                square.set(SquareState::ZoneKeeper);
                 empty_neighbours()
                     .iter()
-                    .for_each(|x| x.state.set(SquareState::InZone(square, player)));
+                    .for_each(|x| x.set(SquareState::InZone(square, player)));
                 clean_zone.set(false);
             }
             SquareState::InZone(owner, player) => {
-                square.state.set(SquareState::Player(player));
-                owner.state.set(SquareState::Empty);
+                square.set(SquareState::Player(player));
+                owner.set(SquareState::Empty);
                 player_turn.update(|player| match player {
                     Player::One => *player = Player::Two,
                     Player::Two => *player = Player::One,
                 });
-                square.should_die(players_soliders);
+                square.should_die(position, players_soliders);
                 neighbours
                     .iter()
-                    .for_each(|x| x.should_die(players_soliders));
-                owner
+                    .for_each(|x| x.should_die(position, players_soliders));
+                position
                     .get_neighbours()
                     .iter()
-                    .filter(|x| matches!(x.state.get(), SquareState::InZone(_, _)))
-                    .for_each(|x| x.state.set(SquareState::Empty));
+                    .filter(|x| matches!(x.get(), SquareState::InZone(_, _)))
+                    .for_each(|x| x.set(SquareState::Empty));
                 clean_zone.set(true);
             }
             SquareState::Empty | SquareState::ZoneKeeper => unreachable!(),
         };
     };
 
-    let class = move || match square.state.get() {
+    let class = move || match square.get() {
         SquareState::Player(Player::One) => "bg-blue-700 w-24 h-24 rounded-full",
         SquareState::Player(Player::Two) => "bg-rose-700 w-24 h-24 rounded-full",
         SquareState::Empty => "border-2 w-24 h-24 rounded-full",
@@ -345,7 +300,7 @@ fn SquareComp(square: Square, clean_zone: RwSignal<bool>) -> impl IntoView {
         SquareState::ZoneKeeper => "bg-gray-700 w-24 h-24 rounded-full",
     };
     let style = move || {
-        if clickable() && !matches!(square.state.get(), SquareState::Empty) {
+        if clickable() && !matches!(square.get(), SquareState::Empty) {
             "outline-style : solid"
         } else {
             ""
@@ -356,5 +311,6 @@ fn SquareComp(square: Square, clean_zone: RwSignal<bool>) -> impl IntoView {
         .attr("style", style)
         .attr("disabled", move || !clickable())
         .on(ev::click, on_click)
+        .child(format!("{:#?}", position))
         .into_view()
 }
