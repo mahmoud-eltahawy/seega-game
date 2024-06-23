@@ -32,22 +32,34 @@ const ROW_WIDTH: usize = 5;
 const TOTAL_SOLIDERS: usize = ROW_WIDTH * ROW_WIDTH;
 const ONE_SIDE_SOLIDERS: usize = TOTAL_SOLIDERS / 2;
 
-lazy_static::lazy_static! {
-    static ref ALL_SQUARES :[[Square;ROW_WIDTH] ;ROW_WIDTH]  = [[Square::new(SquareState::Empty);ROW_WIDTH] ;ROW_WIDTH];
-    static ref ONE_SOLIDERS :[Square ;ONE_SIDE_SOLIDERS]  = [Square::new(SquareState::Player(Player::One)) ;ONE_SIDE_SOLIDERS];
-    static ref TWO_SOLIDERS :[Square ;ONE_SIDE_SOLIDERS]  = [Square::new(SquareState::Player(Player::Two)) ;ONE_SIDE_SOLIDERS];
+struct SolidersPositions {
+    battle_squares: [[Square; ROW_WIDTH]; ROW_WIDTH],
+    one_soliders: [Square; ONE_SIDE_SOLIDERS],
+    two_soliders: [Square; ONE_SIDE_SOLIDERS],
+}
+
+impl SolidersPositions {
+    fn new() -> Self {
+        Self {
+            battle_squares: [[Square::new(SquareState::Empty); ROW_WIDTH]; ROW_WIDTH],
+            one_soliders: [Square::new(SquareState::Player(Player::One)); ONE_SIDE_SOLIDERS],
+            two_soliders: [Square::new(SquareState::Player(Player::Two)); ONE_SIDE_SOLIDERS],
+        }
+    }
 }
 
 lazy_static::lazy_static! {
-    static ref ALL_NEIGHBOURS : Vec<Vec<Vec<Square>>> = ALL_SQUARES
-        .iter().enumerate()
-        .map(|(y,xs)|
-            xs
-            .iter()
-            .enumerate()
-            .map(|(x,_)| Position{y,x}.explore_neighbours())
-            .collect::<Vec<_>>())
-        .collect::<Vec<_>>();
+    static ref SOLIDERS_POSITIONS : SolidersPositions = SolidersPositions::new();
+    static ref BATTLE_NEIGHBOURS: Vec<Vec<Vec<Square>>> = SOLIDERS_POSITIONS.battle_squares
+                .iter()
+                .enumerate()
+                .map(|(y, xs)| {
+                    xs.iter()
+                        .enumerate()
+                        .map(|(x, _)| Position { y, x }.explore_neighbours())
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
 }
 
 impl Player {
@@ -93,7 +105,13 @@ impl Position {
         let mut result = Vec::new();
         let mut push_to_result = |direct: Option<Position>| {
             if let Some(position) = direct {
-                result.push(ALL_SQUARES.get_square(position).cloned().unwrap());
+                result.push(
+                    SOLIDERS_POSITIONS
+                        .battle_squares
+                        .get_square(position)
+                        .cloned()
+                        .unwrap(),
+                );
             };
         };
         let left = self.left();
@@ -109,12 +127,12 @@ impl Position {
 
     fn get_neighbours(self) -> &'static Vec<Square> {
         let Position { y, x } = self;
-        &ALL_NEIGHBOURS[y][x]
+        &BATTLE_NEIGHBOURS[y][x]
     }
 
     fn get_square(self) -> Square {
         let Self { y, x } = self;
-        ALL_SQUARES[y][x]
+        SOLIDERS_POSITIONS.battle_squares[y][x]
     }
 }
 
@@ -126,7 +144,7 @@ impl Sq for Square {
     fn should_die(&self, position: Position, players_soliders: soliders_counter::SolidersCounter) {
         let get_state = |position: Option<Position>| {
             position
-                .map(|pos| ALL_SQUARES.get_square(pos))
+                .map(|pos| SOLIDERS_POSITIONS.battle_squares.get_square(pos))
                 .and_then(|x| x.map(|x| x.get_untracked()))
         };
         let SquareState::Player(self_player) = self.get_untracked() else {
@@ -202,7 +220,8 @@ fn winning_card() -> impl IntoView {
     let on_click = move |_| {
         winner.set(None);
         players_soliders.reset();
-        ALL_SQUARES
+        SOLIDERS_POSITIONS
+            .battle_squares
             .iter()
             .for_each(|y| y.iter().for_each(|x| x.set(SquareState::Empty)));
     };
@@ -240,7 +259,8 @@ fn battle_field() -> impl IntoView {
             "grid grid-cols-5 gap-10 m-5 text-center justify-content-center justify-items-center",
         )
         .child(
-            ALL_SQUARES
+            SOLIDERS_POSITIONS
+                .battle_squares
                 .iter()
                 .enumerate()
                 .map(|(y, squares)| {
