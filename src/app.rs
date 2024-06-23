@@ -187,7 +187,7 @@ pub fn App() -> impl IntoView {
         <Show when=move || winner.get().is_some()>
              <WinningCard/>
         </Show>
-        <BattleField/>
+        <AllSolidersFields/>
         </main>
     }
 }
@@ -215,7 +215,7 @@ fn WinningCard() -> impl IntoView {
 }
 
 #[component]
-fn BattleField() -> impl IntoView {
+fn AllSolidersFields() -> impl IntoView {
     let clean_zone = RwSignal::new(true);
     let players_soliders = use_context::<soliders_counter::SolidersCounter>().unwrap();
     let player_one = move || format!("player one : {}", players_soliders.get(Player::One).get());
@@ -225,23 +225,7 @@ fn BattleField() -> impl IntoView {
         <div>{player_one}</div>
         <div class="grid grid-cols-5 gap-10 m-5 text-center justify-content-center justify-items-center">
         {
-            ALL_SQUARES
-                .iter()
-                .enumerate()
-                .map(|(y,squares)| {
-                    view! {
-                        <For
-                            each=move || {squares.iter().enumerate().map(|(i,_)| i).collect::<Vec<_>>()}
-                            key=|i| {*i}
-                            let:x
-                        >
-                            <SquareComp position=Position { y , x  } clean_zone/>
-                        </For>
-
-                    }
-                })
-                .collect::<Vec<_>>()
-                .into_view()
+            battle_field(clean_zone)
         }
         </div>
         <div>{player_two}</div>
@@ -249,8 +233,22 @@ fn BattleField() -> impl IntoView {
     }
 }
 
-#[component]
-fn SquareComp(position: Position, clean_zone: RwSignal<bool>) -> impl IntoView {
+fn battle_field(clean_zone: RwSignal<bool>) -> impl IntoView {
+    ALL_SQUARES
+        .iter()
+        .enumerate()
+        .map(|(y, squares)| {
+            squares
+                .iter()
+                .enumerate()
+                .map(|(x, _)| square_comp(Position { y, x }, clean_zone))
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>()
+        .into_view()
+}
+
+fn square_comp(position: Position, clean_zone: RwSignal<bool>) -> impl IntoView {
     let square = position.get_square();
     let players_soliders = use_context::<soliders_counter::SolidersCounter>().unwrap();
     let player_turn = use_context::<RwSignal<Player>>().unwrap();
