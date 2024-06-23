@@ -1,6 +1,6 @@
 use leptos::{
     ev,
-    html::{button, div},
+    html::{button, div, p},
     prelude::*,
 };
 
@@ -189,15 +189,14 @@ pub fn App() -> impl IntoView {
     view! {
         <main class="flex flex-col min-h-screen justify-center items-center">
         <Show when=move || winner.get().is_some()>
-             <WinningCard/>
+             {winning_card()}
         </Show>
-        <AllSolidersFields/>
+        {all_soliders_fields()}
         </main>
     }
 }
 
-#[component]
-fn WinningCard() -> impl IntoView {
+fn winning_card() -> impl IntoView {
     let winner = use_context::<RwSignal<Option<Player>>>().unwrap();
     let players_soliders = use_context::<soliders_counter::SolidersCounter>().unwrap();
     let on_click = move |_| {
@@ -207,19 +206,17 @@ fn WinningCard() -> impl IntoView {
             .iter()
             .for_each(|y| y.iter().for_each(|x| x.set(SquareState::Empty)));
     };
-    view! {
-        <div class="bg-white z-20 text-2xl">
-            <p class="border-2 p-5 m-5">{format!("winner is Player {:#?}",winner.get().unwrap())}</p>
-            <button
-                on:click=on_click
-                class="border-2 p-5 m-5"
-            >"play again"</button>
-        </div>
-    }
+    div().attr("class", "bg-white z-20 text-2xl").child((
+        p().attr("class", "border-2 p-5 m-5")
+            .child(format!("winner is Player {:#?}", winner.get().unwrap())),
+        button()
+            .attr("class", "border-2 p-5 m-5")
+            .on(ev::click, on_click)
+            .child("play again"),
+    ))
 }
 
-#[component]
-fn AllSolidersFields() -> impl IntoView {
+fn all_soliders_fields() -> impl IntoView {
     (player_one_field(), battle_field(), player_two_field())
 }
 
