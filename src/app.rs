@@ -25,9 +25,13 @@ enum SquareState {
 mod soliders_counter;
 
 const ROW_WIDTH: usize = 5;
+const TOTAL_SOLIDERS: usize = ROW_WIDTH * ROW_WIDTH;
+const ONE_SIDE_SOLIDERS: usize = TOTAL_SOLIDERS / 2;
 
 lazy_static::lazy_static! {
     static ref ALL_SQUARES :[[Square;ROW_WIDTH] ;ROW_WIDTH]  = [[Square::new(SquareState::Empty);ROW_WIDTH] ;ROW_WIDTH];
+    static ref ONE_SOLIDERS :[Square ;ONE_SIDE_SOLIDERS]  = [Square::new(SquareState::Player(Player::One)) ;ONE_SIDE_SOLIDERS];
+    static ref TWO_SOLIDERS :[Square ;ONE_SIDE_SOLIDERS]  = [Square::new(SquareState::Player(Player::Two)) ;ONE_SIDE_SOLIDERS];
 }
 
 lazy_static::lazy_static! {
@@ -101,7 +105,12 @@ impl Position {
 
     fn get_neighbours(self) -> &'static Vec<Square> {
         let Position { y, x } = self;
-        ALL_NEIGHBOURS.get(y).and_then(|list| list.get(x)).unwrap()
+        &ALL_NEIGHBOURS[y][x]
+    }
+
+    fn get_square(self) -> Square {
+        let Self { y, x } = self;
+        ALL_SQUARES[y][x]
     }
 }
 
@@ -161,7 +170,7 @@ pub fn App() -> impl IntoView {
     let player_turn = RwSignal::new(Player::One);
     let winner = RwSignal::new(None::<Player>);
     provide_context(player_turn);
-    provide_context(players_soliders.clone());
+    provide_context(players_soliders);
     provide_context(winner);
     Effect::new(move |_| {
         let pn1 = players_soliders.get(Player::One).get();
@@ -217,17 +226,16 @@ fn BattleField() -> impl IntoView {
         <div class="grid grid-cols-5 gap-10 m-5 text-center justify-content-center justify-items-center">
         {
             ALL_SQUARES
-                .clone()
-                .into_iter()
+                .iter()
                 .enumerate()
-                .map(|(y,squares)| {//TODO
+                .map(|(y,squares)| {
                     view! {
                         <For
-                            each=move || {squares.clone().into_iter().enumerate().collect::<Vec<_>>()}
-                            key=|(i,_)| {*i}
-                            let:square
+                            each=move || {squares.iter().enumerate().map(|(i,_)| i).collect::<Vec<_>>()}
+                            key=|i| {*i}
+                            let:x
                         >
-                            <SquareComp square=square.1 position=Position { y , x:square.0  } clean_zone/>
+                            <SquareComp position=Position { y , x  } clean_zone/>
                         </For>
 
                     }
@@ -242,7 +250,8 @@ fn BattleField() -> impl IntoView {
 }
 
 #[component]
-fn SquareComp(square: Square, position: Position, clean_zone: RwSignal<bool>) -> impl IntoView {
+fn SquareComp(position: Position, clean_zone: RwSignal<bool>) -> impl IntoView {
+    let square = position.get_square();
     let players_soliders = use_context::<soliders_counter::SolidersCounter>().unwrap();
     let player_turn = use_context::<RwSignal<Player>>().unwrap();
     let neighbours = position.get_neighbours();
