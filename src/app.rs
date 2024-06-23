@@ -1,4 +1,8 @@
-use leptos::{ev, html::button, prelude::*};
+use leptos::{
+    ev,
+    html::{button, div},
+    prelude::*,
+};
 
 type Square = RwSignal<SquareState>;
 
@@ -216,36 +220,41 @@ fn WinningCard() -> impl IntoView {
 
 #[component]
 fn AllSolidersFields() -> impl IntoView {
-    let clean_zone = RwSignal::new(true);
-    let players_soliders = use_context::<soliders_counter::SolidersCounter>().unwrap();
-    let player_one = move || format!("player one : {}", players_soliders.get(Player::One).get());
-    let player_two = move || format!("player two : {}", players_soliders.get(Player::Two).get());
-    view! {
-        <>
-        <div>{player_one}</div>
-        <div class="grid grid-cols-5 gap-10 m-5 text-center justify-content-center justify-items-center">
-        {
-            battle_field(clean_zone)
-        }
-        </div>
-        <div>{player_two}</div>
-        </>
-    }
+    (player_one_field(), battle_field(), player_two_field())
 }
 
-fn battle_field(clean_zone: RwSignal<bool>) -> impl IntoView {
-    ALL_SQUARES
-        .iter()
-        .enumerate()
-        .map(|(y, squares)| {
-            squares
+fn player_one_field() -> impl IntoView {
+    let players_soliders = use_context::<soliders_counter::SolidersCounter>().unwrap();
+    let player_one = move || format!("player one : {}", players_soliders.get(Player::One).get());
+    div().child(player_one)
+}
+
+fn player_two_field() -> impl IntoView {
+    let players_soliders = use_context::<soliders_counter::SolidersCounter>().unwrap();
+    let player_two = move || format!("player two : {}", players_soliders.get(Player::Two).get());
+    div().child(player_two)
+}
+
+fn battle_field() -> impl IntoView {
+    let clean_zone = RwSignal::new(true);
+    div()
+        .attr(
+            "class",
+            "grid grid-cols-5 gap-10 m-5 text-center justify-content-center justify-items-center",
+        )
+        .child(
+            ALL_SQUARES
                 .iter()
                 .enumerate()
-                .map(|(x, _)| square_comp(Position { y, x }, clean_zone))
-                .collect::<Vec<_>>()
-        })
-        .collect::<Vec<_>>()
-        .into_view()
+                .map(|(y, squares)| {
+                    squares
+                        .iter()
+                        .enumerate()
+                        .map(|(x, _)| square_comp(Position { y, x }, clean_zone))
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>(),
+        )
 }
 
 fn square_comp(position: Position, clean_zone: RwSignal<bool>) -> impl IntoView {
@@ -319,5 +328,4 @@ fn square_comp(position: Position, clean_zone: RwSignal<bool>) -> impl IntoView 
         .attr("disabled", move || !clickable())
         .on(ev::click, on_click)
         .child(format!("{:#?}", position))
-        .into_view()
 }
