@@ -236,19 +236,42 @@ fn winning_card() -> impl IntoView {
 }
 
 fn all_soliders_fields() -> impl IntoView {
-    (player_one_field(), battle_field(), player_two_field())
+    div()
+        .attr(
+            "class",
+            "grid grid-cols-1 justify-content-center justify-items-center",
+        )
+        .child((player_one_field(), battle_field(), player_two_field()))
 }
 
 fn player_one_field() -> impl IntoView {
     let players_soliders = use_context::<soliders_counter::SolidersCounter>().unwrap();
     let player_one = move || format!("player one : {}", players_soliders.get(Player::One).get());
-    div().child(player_one)
+    (
+        div()
+            .attr("class", "flex flex-wrap gap-5")
+            .child((SOLIDERS_POSITIONS
+                .one_soliders
+                .iter()
+                .map(|x| non_battle_square_comp(x.clone()))
+                .collect::<Vec<_>>(),)),
+        player_one,
+    )
 }
 
 fn player_two_field() -> impl IntoView {
     let players_soliders = use_context::<soliders_counter::SolidersCounter>().unwrap();
     let player_two = move || format!("player two : {}", players_soliders.get(Player::Two).get());
-    div().child(player_two)
+    (
+        player_two,
+        div()
+            .attr("class", "flex flex-wrap gap-5")
+            .child((SOLIDERS_POSITIONS
+                .two_soliders
+                .iter()
+                .map(|x| non_battle_square_comp(x.clone()))
+                .collect::<Vec<_>>(),)),
+    )
 }
 
 fn battle_field() -> impl IntoView {
@@ -345,4 +368,15 @@ fn square_comp(position: Position, clean_zone: RwSignal<bool>) -> impl IntoView 
         .attr("disabled", move || !clickable())
         .on(ev::click, on_click)
         .child(format!("{:#?}", position))
+}
+
+fn non_battle_square_comp(square: Square) -> impl IntoView {
+    let class = move || match square.get() {
+        SquareState::Player(Player::One) => "bg-blue-700 w-24 h-24 rounded-full",
+        SquareState::Player(Player::Two) => "bg-rose-700 w-24 h-24 rounded-full",
+        SquareState::Empty => "border-2 w-24 h-24 rounded-full",
+        SquareState::InZone(_, _) => "bg-lime-700 w-24 h-24 rounded-full",
+        SquareState::ZoneKeeper => "bg-gray-700 w-24 h-24 rounded-full",
+    };
+    button().attr("class", class)
 }
